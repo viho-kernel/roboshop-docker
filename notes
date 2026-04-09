@@ -1,0 +1,89 @@
+☕ Java
+JRE (Java Runtime Environment) → runs Java bytecode (.class / .jar).
+
+JDK (Java Development Kit) → JRE + compilers + build tools.
+
+Build workflow:
+
+Use Maven/Gradle → produces target/ folder with .jar.
+
+.jar = compiled bytecode + bundled dependencies.
+
+Docker pattern:
+
+Build stage: needs JDK + Maven.
+
+Runtime stage: only JRE (lighter).
+
+dockerfile
+FROM maven:3.9-eclipse-temurin-17 AS builder
+WORKDIR /app
+COPY . .
+RUN mvn package -DskipTests
+
+FROM eclipse-temurin:17-jre
+WORKDIR /app
+COPY --from=builder /app/target/app.jar .
+CMD ["java", "-jar", "app.jar"]
+🟢 Node.js
+Dependencies: installed via npm install → creates node_modules/.
+
+Platform independence: Node.js bytecode runs on any OS with Node runtime.
+
+Docker pattern:
+
+Build stage: install dependencies.
+
+Runtime stage: copy node_modules + source code.
+
+dockerfile
+FROM node:20 AS builder
+WORKDIR /app
+COPY package*.json .
+RUN npm install
+COPY . .
+
+FROM node:20-slim
+WORKDIR /app
+COPY --from=builder /app .
+CMD ["node", "server.js"]
+🐍 Python
+Dependencies: installed via pip → stored in Python site‑packages directory.
+
+Platform dependence: compiled C extensions differ per OS.
+
+Docker pattern:
+
+Build stage: needs compilers (build-base, linux-headers, pcre-dev) for native modules.
+
+Runtime stage: only lightweight runtime libs (pcre).
+
+dockerfile
+FROM python:3.11-alpine AS builder
+WORKDIR /app
+RUN apk add --no-cache build-base linux-headers pcre-dev
+COPY requirements.txt .
+RUN pip install --prefix=/install -r requirements.txt
+
+FROM python:3.11-alpine
+WORKDIR /app
+RUN apk add --no-cache pcre
+COPY --from=builder /install /usr/local
+COPY . .
+CMD ["python", "app.py"]
+🔑 General Docker image principles
+Separate build vs runtime → multi-stage builds keep images small.
+
+Install dependencies in a different path → copy only what’s needed into runtime.
+
+Build stage → heavy packages (compilers, headers).
+
+Runtime stage → minimal packages (just runtime libs).
+
+Language differences:
+
+Java → .jar file is portable.
+
+Node.js → node_modules copied.
+
+Python → site‑packages compiled per OS.
